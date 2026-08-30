@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Operator } from "@/lib/calculator";
+import { calculate, type Operator } from "@/lib/calculator";
 import CalculatorButton from "@/components/CalculatorButton";
 import CalculatorDisplay from "@/components/CalculatorDisplay";
 

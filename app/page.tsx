@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { calculate, type Operator } from "@/lib/calculator";
+import type { Operator } from "@/lib/calculator";
 import CalculatorButton from "@/components/CalculatorButton";
 import CalculatorDisplay from "@/components/CalculatorDisplay";
 
@@ -84,33 +84,44 @@ export default function Home() {
     setWaitingForSecondNumber(true);
   }
 
-  function handleEquals() {
-    if (firstNumber === null || operator === null) {
-      return;
+  async function handleEquals() {
+  if (firstNumber === null || operator === null) {
+    return;
+  }
+
+  try {
+    setError(null);
+
+    const response = await fetch("/api/calculate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        a: firstNumber,
+        b: Number(display),
+        operation: operator,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Erro ao realizar o cálculo");
     }
 
-    try {
-      const secondNumber = Number(display);
-
-      const result = calculate(
-        firstNumber,
-        operator,
-        secondNumber
-      );
-
-      setDisplay(String(result));
-      setFirstNumber(null);
-      setOperator(null);
-      setWaitingForSecondNumber(true);
-      setError(null);
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError("Ocurreu um erro inesperado.");
-      }
+    setDisplay(String(data.result));
+    setFirstNumber(null);
+    setOperator(null);
+    setWaitingForSecondNumber(true);
+  } catch (error) {
+    if (error instanceof Error) {
+      setError(error.message);
+    } else {
+      setError("Ocorreu um erro inesperado.");
     }
   }
+}
 
   function handleClear() {
     setDisplay("0");

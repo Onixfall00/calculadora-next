@@ -7,10 +7,37 @@ export async function POST(request: Request) {
 
     const { a, b, operation } = body;
 
+    if (
+      typeof a !== "number" ||
+      !Number.isFinite(a) ||
+      typeof b !== "number" ||
+      !Number.isFinite(b)
+    ) {
+      return NextResponse.json(
+        {
+          error: "a e b devem ser números válidos",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+     
+    if (!["+", "-", "*", "/"].includes(operation)) {
+      return NextResponse.json(
+        {
+          error: "Operação inválida",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
     const result = calculate(
-      Number(a),
+      a,
       operation as Operator,
-      Number(b)
+      b
     );
 
     return NextResponse.json({

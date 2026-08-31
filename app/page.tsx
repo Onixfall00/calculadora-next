@@ -11,6 +11,8 @@ export default function Home() {
   const [operator, setOperator] = useState<Operator | null>(null);
   const [waitingForSecondNumber, setWaitingForSecondNumber] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [justCalculated, setJustCalculated] = useState(false);
+
   const numberButtons = [
     "7",
     "8",
@@ -24,21 +26,15 @@ export default function Home() {
     "0",
   ];
 
-  const operatorButtons = [
-    "/",
-    "*",
-    "-",
-    "+",
-  ];
-
-  function handleOperatorButton(value: string) {
-    handleOperator(value as Operator);
-  }
+  const operatorButtons: Operator[] = ["/", "*", "-", "+"];
 
   function handleNumber(value: string) {
-    if (waitingForSecondNumber) {
+    setError(null);
+
+    if (waitingForSecondNumber || justCalculated) {
       setDisplay(value);
       setWaitingForSecondNumber(false);
+      setJustCalculated(false);
       return;
     }
 
@@ -53,18 +49,15 @@ export default function Home() {
 
   function handleOperator(nextOperator: Operator) {
     setError(null);
+    setJustCalculated(false);
 
     const currentNumber = Number(display);
 
     if (firstNumber === null) {
       setFirstNumber(currentNumber);
-    } else if (operator !== null) {
+    } else if (operator !== null && !waitingForSecondNumber) {
       try {
-        const result = calculate(
-          firstNumber,
-          operator,
-          currentNumber
-        );
+        const result = calculate(firstNumber, operator, currentNumber);
 
         setDisplay(String(result));
         setFirstNumber(result);
@@ -72,7 +65,7 @@ export default function Home() {
         if (error instanceof Error) {
           setError(error.message);
         } else {
-          setError("Ocurreu um erro inesperado.");
+          setError("Ocorreu um erro inesperado.");
         }
 
         handleClear();
@@ -85,56 +78,61 @@ export default function Home() {
   }
 
   async function handleEquals() {
-  if (firstNumber === null || operator === null) {
-    return;
-  }
-
-  try {
-    setError(null);
-
-    const response = await fetch("/api/calculate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        a: firstNumber,
-        b: Number(display),
-        operation: operator,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Erro ao realizar o cálculo");
+    if (firstNumber === null || operator === null || waitingForSecondNumber) {
+      return;
     }
 
-    setDisplay(String(data.result));
-    setFirstNumber(null);
-    setOperator(null);
-    setWaitingForSecondNumber(true);
-  } catch (error) {
-    if (error instanceof Error) {
-      setError(error.message);
-    } else {
-      setError("Ocorreu um erro inesperado.");
+    try {
+      setError(null);
+
+      const response = await fetch("/api/calculate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          a: firstNumber,
+          b: Number(display),
+          operation: operator,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao realizar o cálculo");
+      }
+
+      setDisplay(String(data.result));
+      setFirstNumber(null);
+      setOperator(null);
+      setWaitingForSecondNumber(false);
+      setJustCalculated(true);
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError("Ocorreu um erro inesperado.");
+      }
     }
   }
-}
 
   function handleClear() {
     setDisplay("0");
     setFirstNumber(null);
     setOperator(null);
     setWaitingForSecondNumber(false);
+    setJustCalculated(false);
     setError(null);
   }
 
   function handleDecimal() {
-    if (waitingForSecondNumber) {
+    setError(null);
+
+    if (waitingForSecondNumber || justCalculated) {
       setDisplay("0.");
       setWaitingForSecondNumber(false);
+      setJustCalculated(false);
       return;
     }
 
@@ -143,18 +141,36 @@ export default function Home() {
     }
   }
 
+  function handleToggleSign() {
+    setError(null);
+
+    if (display === "0") {
+      return;
+    }
+
+    setDisplay((current) => String(-Number(current)));
+  }
+
+  function handlePercentage() {
+    setError(null);
+
+    setDisplay((current) => {
+      const value = Number(current);
+
+      if (!Number.isFinite(value)) {
+        return current;
+      }
+
+      return String(value / 100);
+    });
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-100">
-
       <div className="w-80 rounded-2xl bg-black p-4 shadow-2xl">
+        <CalculatorDisplay value={display} error={error} />
 
-        <CalculatorDisplay
-          value={display}
-          error={error}
-        />
-        
         <div className="grid grid-cols-4 gap-2">
-
           <CalculatorButton
             label="C"
             variant="action"
@@ -164,21 +180,19 @@ export default function Home() {
           <CalculatorButton
             label="+/-"
             variant="action"
-            onClick={() => setDisplay(String(-Number(display)))}
+            onClick={handleToggleSign}
           />
 
           <CalculatorButton
             label="%"
             variant="action"
-            onClick={() =>
-              setDisplay(String(Number(display) / 100))
-            }
+            onClick={handlePercentage}
           />
 
           <CalculatorButton
             label="÷"
             variant="operator"
-            onClick={() => handleOperatorButton("/")}
+            onClick={() => handleOperator(operatorButtons[0])}
           />
 
           {numberButtons.slice(0, 3).map((number) => (
@@ -192,7 +206,7 @@ export default function Home() {
           <CalculatorButton
             label="×"
             variant="operator"
-            onClick={() => handleOperatorButton("*")}
+            onClick={() => handleOperator(operatorButtons[1])}
           />
 
           {numberButtons.slice(3, 6).map((number) => (
@@ -206,7 +220,7 @@ export default function Home() {
           <CalculatorButton
             label="-"
             variant="operator"
-            onClick={() => handleOperatorButton("-")}
+            onClick={() => handleOperator(operatorButtons[2])}
           />
 
           {numberButtons.slice(6, 9).map((number) => (
@@ -220,7 +234,7 @@ export default function Home() {
           <CalculatorButton
             label="+"
             variant="operator"
-            onClick={() => handleOperatorButton("+")}
+            onClick={() => handleOperator(operatorButtons[3])}
           />
 
           <CalculatorButton
@@ -239,7 +253,6 @@ export default function Home() {
             variant="operator"
             onClick={handleEquals}
           />
-
         </div>
       </div>
     </main>
